@@ -1,0 +1,416 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useClosingReport } from "@/hooks/useClosingReport";
+import { DailyReport } from "@/types";
+import { formatCurrency, formatDate, formatTime, getTodayKey } from "@/lib/utils";
+import {
+  FileBarChart,
+  Download,
+  FileText,
+  AlertTriangle,
+  CheckCircle,
+  IndianRupee,
+  Banknote,
+  Smartphone,
+  CreditCard,
+  ShoppingBag,
+  Receipt,
+  TrendingUp,
+  Lock,
+} from "lucide-react";
+import { getItem } from "@/lib/storage";
+import { KEYS } from "@/lib/storage";
+
+function PinModal({
+  onConfirm,
+  onCancel,
+  title,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+  title: string;
+}) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+
+  function check() {
+    const savedPin = getItem<string>(KEYS.ADMIN_PIN) ?? "1234";
+    if (pin === savedPin) {
+      onConfirm();
+    } else {
+      setError("Incorrect PIN");
+      setPin("");
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+      <div className="rounded-2xl p-6 w-full max-w-xs space-y-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+        <div className="flex items-center gap-2">
+          <Lock size={18} style={{ color: "var(--accent)" }} />
+          <p className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>{title}</p>
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={8}
+          value={pin}
+          onChange={(e) => { setPin(e.target.value); setError(""); }}
+          placeholder="Enter admin PIN"
+          autoFocus
+          className="w-full px-3 py-3 rounded-xl outline-none text-sm text-center tracking-widest"
+          style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+          onKeyDown={(e) => e.key === "Enter" && check()}
+        />
+        {error && <p className="text-xs text-center" style={{ color: "var(--red)" }}>{error}</p>}
+        <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>Default PIN: 1234</p>
+        <div className="flex gap-2">
+          <button onClick={check} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ background: "var(--accent)", color: "#fff" }}>
+            Confirm
+          </button>
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-sm" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportRow({ label, value, color, icon: Icon }: { label: string; value: string; color?: string; icon?: React.ElementType }) {
+  return (
+    <div className="flex items-center justify-between py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+      <div className="flex items-center gap-2">
+        {Icon && <Icon size={14} style={{ color: color ?? "var(--text-muted)" }} />}
+        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{label}</span>
+      </div>
+      <span className="text-sm font-semibold" style={{ color: color ?? "var(--text-primary)" }}>{value}</span>
+    </div>
+  );
+}
+
+export default function ClosingPage() {
+  const { getOpeningCash, setOpeningCash, generateReport, closeDay } = useClosingReport();
+
+  const [openingCash, setOpeningCashState] = useState(0);
+  const [openingInput, setOpeningInput] = useState("");
+  const [openingSet, setOpeningSet] = useState(false);
+  const [report, setReport] = useState<DailyReport | null>(null);
+  const [showPinForClose, setShowPinForClose] = useState(false);
+  const [dayClosed, setDayClosed] = useState(false);
+
+  useEffect(() => {
+    const saved = getOpeningCash();
+    if (saved > 0) {
+      setOpeningCash(saved);
+      setOpeningCashState(saved);
+      setOpeningSet(true);
+    }
+  }, [getOpeningCash]);
+
+  const handleSetOpeningCash = () => {
+    const val = parseFloat(openingInput);
+    if (isNaN(val) || val < 0) return;
+    setOpeningCash(val);
+    setOpeningCashState(val);
+    setOpeningSet(true);
+  };
+
+  const handleGenerate = useCallback(() => {
+    const r = generateReport();
+    setReport(r);
+  }, [generateReport]);
+
+  const handleCloseDayConfirmed = useCallback(() => {
+    setShowPinForClose(false);
+    const r = closeDay();
+    setReport(r);
+    setDayClosed(true);
+  }, [closeDay]);
+
+  // ── Export CSV ──────────────────────────────────────────────────
+  const exportCSV = useCallback(() => {
+    if (!report) return;
+    const rows = [
+      ["Daily Closing Report", formatDate(report.date)],
+      [],
+      ["Field", "Value"],
+      ["Opening Cash", report.openingCash.toFixed(2)],
+      ["Total Sales", report.summary.totalSales.toFixed(2)],
+      ["Cash Sales", report.summary.cashSales.toFixed(2)],
+      ["UPI Sales", report.summary.upiSales.toFixed(2)],
+      ["Card Sales", report.summary.cardSales.toFixed(2)],
+      ["Total Items Sold", report.summary.totalItems.toString()],
+      ["Bills Count", report.transactionCount.toString()],
+      ["Total Expenses", report.totalExpenses.toFixed(2)],
+      ["Net Profit", report.netProfit.toFixed(2)],
+      [],
+      ["Transactions"],
+      ["Time", "Items", "Total", "Payment"],
+      ...report.transactions.map((t) => [
+        formatTime(t.timestamp),
+        t.items.map((i) => `${i.productName}×${i.quantity}`).join("; "),
+        t.total.toFixed(2),
+        t.paymentMode.toUpperCase(),
+      ]),
+      [],
+      ["Expenses"],
+      ["Title", "Category", "Amount", "Notes"],
+      ...report.expenses.map((e) => [e.title, e.category, e.amount.toFixed(2), e.notes ?? ""]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `closing-report-${report.date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [report]);
+
+  // ── Export PDF via browser print ────────────────────────────────
+  const exportPDF = useCallback(() => {
+    if (!report) return;
+    window.print();
+  }, [report]);
+
+  const today = getTodayKey();
+
+  return (
+    <>
+      {showPinForClose && (
+        <PinModal
+          title="Admin PIN — Close Day"
+          onConfirm={handleCloseDayConfirmed}
+          onCancel={() => setShowPinForClose(false)}
+        />
+      )}
+
+      <div className="p-4 space-y-4" id="closing-report-root">
+        {/* Header */}
+        <div
+          className="rounded-2xl p-4 flex items-center gap-3 no-print"
+          style={{ background: "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)" }}
+        >
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <FileBarChart size={22} className="text-white" />
+          </div>
+          <div>
+            <p className="text-white font-semibold text-base leading-tight">Daily Closing Report</p>
+            <p className="text-white/70 text-xs">{formatDate(today)}</p>
+          </div>
+        </div>
+
+        {/* Opening Cash */}
+        {!openingSet ? (
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              Set Opening Cash Balance
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Enter the cash amount available at the start of today.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={openingInput}
+                onChange={(e) => setOpeningInput(e.target.value)}
+                placeholder="₹ Opening cash"
+                className="flex-1 px-3 py-2.5 rounded-xl outline-none text-sm"
+                style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+              />
+              <button
+                onClick={handleSetOpeningCash}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                Set
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-3 p-3 rounded-2xl no-print"
+            style={{ background: "var(--green-soft)", border: "1px solid var(--green)" }}
+          >
+            <CheckCircle size={18} style={{ color: "var(--green)" }} />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Opening Cash: {formatCurrency(openingCash)}
+              </p>
+              <button
+                onClick={() => setOpeningSet(false)}
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Generate / Action Buttons */}
+        {!dayClosed && (
+          <div className="flex gap-2 no-print">
+            <button
+              onClick={handleGenerate}
+              disabled={!openingSet}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-40"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              <FileBarChart size={15} /> Generate Report
+            </button>
+            {report && (
+              <button
+                onClick={() => setShowPinForClose(true)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{ background: "var(--red)", color: "#fff" }}
+              >
+                <Lock size={15} /> Close Day
+              </button>
+            )}
+          </div>
+        )}
+
+        {dayClosed && (
+          <div
+            className="flex items-center gap-3 p-3 rounded-2xl no-print"
+            style={{ background: "var(--red-soft)", border: "1px solid var(--red)" }}
+          >
+            <AlertTriangle size={18} style={{ color: "var(--red)" }} />
+            <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              Day closed. Dashboard reset for tomorrow.
+            </p>
+          </div>
+        )}
+
+        {/* Report Summary */}
+        {report && (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+          >
+            {/* Print Header (visible only on print) */}
+            <div className="hidden print-only p-4">
+              <h1 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "4px" }}>
+                Daily Closing Report
+              </h1>
+              <p style={{ fontSize: "13px", color: "#555" }}>{formatDate(report.date)}</p>
+              <p style={{ fontSize: "11px", color: "#888" }}>
+                Generated at {formatTime(report.archivedAt)}
+              </p>
+            </div>
+
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                  Summary
+                </p>
+                {/* Export buttons */}
+                <div className="flex gap-2 no-print">
+                  <button
+                    onClick={exportPDF}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                    style={{ background: "var(--blue-soft)", color: "var(--blue)" }}
+                  >
+                    <Download size={12} /> PDF
+                  </button>
+                  <button
+                    onClick={exportCSV}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                    style={{ background: "var(--green-soft)", color: "var(--green)" }}
+                  >
+                    <FileText size={12} /> CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 pb-2">
+              <ReportRow icon={Banknote} label="Opening Cash" value={formatCurrency(report.openingCash)} />
+              <ReportRow icon={IndianRupee} label="Total Sales" value={formatCurrency(report.summary.totalSales)} color="var(--accent)" />
+              <ReportRow icon={Banknote} label="Cash Collected" value={formatCurrency(report.summary.cashSales)} color="var(--green)" />
+              <ReportRow icon={Smartphone} label="UPI Collected" value={formatCurrency(report.summary.upiSales)} color="var(--yellow)" />
+              <ReportRow icon={CreditCard} label="Card Collected" value={formatCurrency(report.summary.cardSales)} color="var(--blue)" />
+              <ReportRow icon={ShoppingBag} label="Total Items Sold" value={report.summary.totalItems.toString()} color="var(--purple)" />
+              <ReportRow icon={FileBarChart} label="Bills Count" value={report.transactionCount.toString()} />
+              <ReportRow icon={Receipt} label="Total Expenses" value={formatCurrency(report.totalExpenses)} color="var(--orange)" />
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={14} style={{ color: report.netProfit >= 0 ? "var(--green)" : "var(--red)" }} />
+                  <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Net Profit</span>
+                </div>
+                <span
+                  className="text-base font-bold"
+                  style={{ color: report.netProfit >= 0 ? "var(--green)" : "var(--red)" }}
+                >
+                  {formatCurrency(report.netProfit)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Transaction breakdown */}
+        {report && report.transactions.length > 0 && (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+          >
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                Transactions ({report.transactions.length})
+              </p>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              {report.transactions.map((t) => (
+                <div key={t.id} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                      {t.items.map((i) => `${i.productName}×${i.quantity}`).join(", ")}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatTime(t.timestamp)} · {t.paymentMode.toUpperCase()}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold shrink-0 ml-2" style={{ color: "var(--accent)" }}>
+                    {formatCurrency(t.total)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Expense breakdown */}
+        {report && report.expenses.length > 0 && (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+          >
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+              <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                Expenses ({report.expenses.length})
+              </p>
+            </div>
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              {report.expenses.map((e) => (
+                <div key={e.id} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{e.title}</p>
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>{e.category}{e.notes ? ` · ${e.notes}` : ""}</p>
+                  </div>
+                  <p className="text-sm font-semibold shrink-0 ml-2" style={{ color: "var(--orange)" }}>
+                    {formatCurrency(e.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
