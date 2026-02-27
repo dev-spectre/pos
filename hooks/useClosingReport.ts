@@ -66,6 +66,7 @@ export function useClosingReport() {
       transactionCount: todayTxns.length,
       transactions: todayTxns,
       expenses: todayExpenses,
+      syncStatus: "pending",
     };
   }, [getOpeningCash]);
 
@@ -80,6 +81,11 @@ export function useClosingReport() {
     setItem(KEYS.TRANSACTIONS, remaining);
     // Clear opening cash
     removeItem(KEYS.OPENING_CASH);
+    
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("syncRequested"));
+    }
+    
     return report;
   }, [generateReport]);
 

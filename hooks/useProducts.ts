@@ -9,10 +9,12 @@ import { generateId } from "@/lib/utils";
 function initializeData() {
   const seeded = getItem<boolean>(KEYS.SEEDED);
   if (!seeded) {
-    setItem(KEYS.CATEGORIES, DEFAULT_CATEGORIES);
+    const defaultCats = DEFAULT_CATEGORIES.map((c) => ({ ...c, syncStatus: "pending" as const }));
+    setItem(KEYS.CATEGORIES, defaultCats);
     const products: Product[] = SEED_PRODUCTS.map((p) => ({
       ...p,
       orderFrequency: 0,
+      syncStatus: "pending",
     }));
     setItem(KEYS.PRODUCTS, products);
     setItem(KEYS.SEEDED, true);
@@ -31,6 +33,20 @@ export function useProducts() {
     setProducts(storedProducts);
     setCategories(storedCategories);
     setInitialized(true);
+
+    // Fetch fresh from server if online
+    if (navigator.onLine) {
+      fetch("/api/products")
+        .then((res) => res.json())
+        .then((serverProducts) => {
+          if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+            const syncedProducts = serverProducts.map((p: any) => ({ ...p, syncStatus: "synced" }));
+            setItem(KEYS.PRODUCTS, syncedProducts);
+            setProducts(syncedProducts);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch products:", err));
+    }
   }, []);
 
   const saveProducts = useCallback((updated: Product[]) => {
@@ -49,9 +65,15 @@ export function useProducts() {
         ...data,
         id: generateId(),
         orderFrequency: 0,
+        syncStatus: "pending",
       };
       const updated = [...products, newProduct];
       saveProducts(updated);
+      
+      // Trigger sync for new products
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [products, saveProducts]
   );
@@ -59,9 +81,13 @@ export function useProducts() {
   const updateProduct = useCallback(
     (id: string, data: Partial<Omit<Product, "id">>) => {
       const updated = products.map((p) =>
-        p.id === id ? { ...p, ...data } : p
+        p.id === id ? { ...p, ...data, syncStatus: "pending" as const } : p
       );
       saveProducts(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [products, saveProducts]
   );
@@ -77,9 +103,13 @@ export function useProducts() {
   const toggleActive = useCallback(
     (id: string) => {
       const updated = products.map((p) =>
-        p.id === id ? { ...p, active: !p.active } : p
+        p.id === id ? { ...p, active: !p.active, syncStatus: "pending" as const } : p
       );
       saveProducts(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [products, saveProducts]
   );
@@ -88,10 +118,14 @@ export function useProducts() {
     (productIds: string[]) => {
       const updated = products.map((p) =>
         productIds.includes(p.id)
-          ? { ...p, orderFrequency: p.orderFrequency + 1 }
+          ? { ...p, orderFrequency: p.orderFrequency + 1, syncStatus: "pending" as const }
           : p
       );
       saveProducts(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [products, saveProducts]
   );
@@ -100,9 +134,13 @@ export function useProducts() {
     (name: string) => {
       const id = name.toLowerCase().replace(/\s+/g, "-");
       if (categories.some((c) => c.id === id)) return;
-      const newCat: Category = { id, name };
+      const newCat: Category = { id, name, syncStatus: "pending" };
       const updated = [...categories, newCat];
       saveCategories(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [categories, saveCategories]
   );

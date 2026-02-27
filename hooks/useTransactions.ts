@@ -28,10 +28,17 @@ export function useTransactions() {
         items,
         total,
         paymentMode,
+        syncStatus: "pending",
       };
       const updated = [...all, txn];
       setItem(KEYS.TRANSACTIONS, updated);
       setTransactions(updated.filter((t) => t.date === getTodayKey()));
+      
+      // Trigger global sync event
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
+
       return txn;
     },
     []

@@ -22,14 +22,19 @@ export function useExpenses() {
   }, []);
 
   const addExpense = useCallback(
-    (data: Omit<Expense, "id" | "createdAt">) => {
+    (data: Omit<Expense, "id" | "createdAt" | "syncStatus">) => {
       const all = load();
       const newExpense: Expense = {
         ...data,
         id: generateId(),
         createdAt: Date.now(),
+        syncStatus: "pending",
       };
       persist([...all, newExpense]);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [load, persist]
   );

@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+import { SyncManager } from "@/components/SyncManager";
+
 export default function RootLayout({
   children,
 }: {
@@ -29,6 +31,7 @@ export default function RootLayout({
       </head>
       <body className="flex flex-col h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
         <ThemeProvider>
+          <SyncManager />
           <TopBar />
           <main className="flex-1 overflow-y-auto pb-20">
             {children}

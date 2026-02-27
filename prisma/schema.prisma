@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  isDefault Boolean   @default(false)
+  products  Product[]
+}
+
+model Product {
+  id             String           @id @default(uuid())
+  name           String
+  price          Float
+  active         Boolean          @default(true)
+  orderFrequency Int              @default(0)
+  categoryId     String
+  category       Category         @relation(fields: [categoryId], references: [id])
+  billItems      BillItemRecord[]
+}
+
+model Transaction {
+  id          String           @id @default(uuid())
+  date        String           // YYYY-MM-DD
+  timestamp   Float            // Unix ms
+  total       Float
+  paymentMode String           // "cash" | "upi" | "card"
+  items       BillItemRecord[]
+  createdAt   DateTime         @default(now())
+}
+
+model BillItemRecord {
+  id            String      @id @default(uuid())
+  productId     String
+  productName   String
+  price         Float
+  quantity      Int
+  subtotal      Float
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  product       Product     @relation(fields: [productId], references: [id])
+}
+
+model Expense {
+  id        String   @id @default(uuid())
+  title     String
+  category  String   // raw_materials, salary, etc.
+  amount    Float
+  date      String   // YYYY-MM-DD
+  notes     String?
+  createdAt Float    // Unix ms
+}
+
+model DailyReport {
+  id               String   @id @default(uuid())
+  date             String   @unique // YYYY-MM-DD
+  archivedAt       Float    // Unix ms
+  openingCash      Float
+  totalSales       Float
+  cashSales        Float
+  upiSales         Float
+  cardSales        Float
+  totalItems       Int
+  totalExpenses    Float
+  netProfit        Float
+  transactionCount Int
+}
