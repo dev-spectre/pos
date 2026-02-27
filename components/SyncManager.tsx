@@ -14,7 +14,7 @@ export function SyncManager() {
     try {
       // 1. Sync Categories (No relational dependencies)
       let allCategories = getItem<Category[]>(KEYS.CATEGORIES) ?? [];
-      let pendingCategories = allCategories.filter((c) => c.syncStatus !== "synced");
+      let pendingCategories = allCategories.filter((c) => c.syncStatus !== "synced").slice(0, 30);
       
       if (pendingCategories.length > 0) {
         const resCat = await fetch("/api/sync/categories", {
@@ -34,7 +34,7 @@ export function SyncManager() {
 
       // 2. Sync Products (Depends on Categories)
       let allProducts = getItem<Product[]>(KEYS.PRODUCTS) ?? [];
-      let pendingProducts = allProducts.filter((p) => p.syncStatus !== "synced");
+      let pendingProducts = allProducts.filter((p) => p.syncStatus !== "synced").slice(0, 30);
 
       if (pendingProducts.length > 0) {
         const resProd = await fetch("/api/sync/products", {
@@ -54,7 +54,7 @@ export function SyncManager() {
 
       // 3. Sync Transactions (Depends on Products)
       let allTxns = getItem<Transaction[]>(KEYS.TRANSACTIONS) ?? [];
-      let pendingTxns = allTxns.filter((t) => t.syncStatus !== "synced");
+      let pendingTxns = allTxns.filter((t) => t.syncStatus !== "synced").slice(0, 20);
 
       if (pendingTxns.length > 0) {
         const resTxn = await fetch("/api/sync/transactions", {
@@ -75,7 +75,7 @@ export function SyncManager() {
 
       // 4. Sync Expenses (Independent)
       let allExpenses = getItem<Expense[]>(KEYS.EXPENSES) ?? [];
-      let pendingExpenses = allExpenses.filter((e) => e.syncStatus !== "synced");
+      let pendingExpenses = allExpenses.filter((e) => e.syncStatus !== "synced").slice(0, 30);
 
       if (pendingExpenses.length > 0) {
         const resExp = await fetch("/api/sync/expenses", {
@@ -96,7 +96,7 @@ export function SyncManager() {
 
       // 5. Sync Daily Reports (Archived history)
       let allReports = getItem<DailyReport[]>(KEYS.ARCHIVED_REPORTS) ?? [];
-      let pendingReports = allReports.filter((r) => r.syncStatus !== "synced");
+      let pendingReports = allReports.filter((r) => r.syncStatus !== "synced").slice(0, 10);
 
       if (pendingReports.length > 0) {
         const resRep = await fetch("/api/sync/reports", {
@@ -123,23 +123,30 @@ export function SyncManager() {
   }, []);
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const debouncedSync = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(attemptSync, 2000);
+    };
+
     // Attempt sync on mount
-    attemptSync();
+    debouncedSync();
 
     // Listen for online events
-    const handleOnline = () => attemptSync();
-    window.addEventListener("online", handleOnline);
+    window.addEventListener("online", debouncedSync);
 
     // Listen for manual sync triggers from hooks
-    window.addEventListener("syncRequested", attemptSync);
+    window.addEventListener("syncRequested", debouncedSync);
 
-    // Periodic background sync every 30 seconds
-    const intervalId = setInterval(attemptSync, 30_000);
+    // Periodic background sync every 60 seconds
+    const intervalId = setInterval(debouncedSync, 60_000);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("syncRequested", attemptSync);
+      window.removeEventListener("online", debouncedSync);
+      window.removeEventListener("syncRequested", debouncedSync);
       clearInterval(intervalId);
+      clearTimeout(timeoutId);
     };
   }, [attemptSync]);
 
