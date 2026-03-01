@@ -108,13 +108,39 @@ function TransactionCard({ txn, onDelete }: { txn: Transaction; onDelete: () => 
 }
 
 export default function HistoryPage() {
-  const { transactions, deleteTransaction } = useTransactions();
+  const { transactions, deleteTransaction, getTransactionsByDate } = useTransactions();
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+  });
 
-  const sorted = [...transactions].sort((a, b) => b.timestamp - a.timestamp);
-  const totalToday = sorted.reduce((s, t) => s + t.total, 0);
+  const displayTransactions = selectedDate === new Date().toISOString().split("T")[0] 
+    ? transactions 
+    : getTransactionsByDate(selectedDate);
+
+  const sorted = [...displayTransactions].sort((a, b) => b.timestamp - a.timestamp);
+  const totalForDate = sorted.reduce((s, t) => s + t.total, 0);
 
   return (
     <div className="p-4 space-y-4">
+      {/* Date Picker Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Transaction History</h1>
+        <input
+          type="date"
+          value={selectedDate}
+          max={new Date().toISOString().split("T")[0]}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2"
+          style={{
+            background: "var(--bg-elevated)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border)",
+            accentColor: "var(--accent)"
+          }}
+        />
+      </div>
+
       {/* Header summary */}
       <div
         className="rounded-2xl p-4 flex items-center justify-between"
@@ -123,8 +149,10 @@ export default function HistoryPage() {
         }}
       >
         <div>
-          <p className="text-white/70 text-xs font-medium">Today&apos;s Total</p>
-          <p className="text-white text-2xl font-extrabold">{formatCurrency(totalToday)}</p>
+          <p className="text-white/70 text-xs font-medium">
+            {selectedDate === new Date().toISOString().split("T")[0] ? "Today's Total" : "Total for " + selectedDate}
+          </p>
+          <p className="text-white text-2xl font-extrabold">{formatCurrency(totalForDate)}</p>
           <p className="text-white/60 text-xs">{sorted.length} transaction{sorted.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
@@ -136,7 +164,7 @@ export default function HistoryPage() {
           style={{ color: "var(--text-muted)" }}
         >
           <Clock size={40} strokeWidth={1.2} />
-          <p className="text-sm">No transactions yet today</p>
+          <p className="text-sm">No transactions on this date</p>
           <a href="/billing" className="text-xs" style={{ color: "var(--accent)" }}>
             Go to Billing →
           </a>

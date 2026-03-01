@@ -48,3 +48,25 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const expenses = await prisma.expense.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200
+    });
+    
+    const formattedExpenses = expenses.map(e => ({
+      ...e,
+      syncStatus: "synced"
+    }));
+
+    return NextResponse.json({ success: true, expenses: formattedExpenses });
+  } catch (error) {
+    console.error("Failed to fetch expenses:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

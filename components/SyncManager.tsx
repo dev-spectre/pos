@@ -12,6 +12,33 @@ export function SyncManager() {
     syncInProgress.current = true;
 
     try {
+      // 0. Pull initial data if localStorage is empty
+      const txns = getItem<Transaction[]>(KEYS.TRANSACTIONS) ?? [];
+      if (txns.length === 0) {
+        const res = await fetch("/api/sync/transactions");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.transactions?.length > 0) {
+            setItem(KEYS.TRANSACTIONS, data.transactions);
+            window.dispatchEvent(new Event("syncRequested"));
+          }
+        }
+      }
+
+      const reports = getItem<DailyReport[]>(KEYS.ARCHIVED_REPORTS) ?? [];
+      if (reports.length === 0) {
+        const res = await fetch("/api/sync/reports");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.reports?.length > 0) {
+            setItem(KEYS.ARCHIVED_REPORTS, data.reports);
+            window.dispatchEvent(new Event("syncRequested"));
+          }
+        }
+      }
+
+      // --- PUSH PHASE ---
+      
       // 1. Sync Categories (No relational dependencies)
       let allCategories = getItem<Category[]>(KEYS.CATEGORIES) ?? [];
       let pendingCategories = allCategories.filter((c) => c.syncStatus !== "synced").slice(0, 30);
@@ -113,6 +140,83 @@ export function SyncManager() {
           );
           setItem(KEYS.ARCHIVED_REPORTS, allReports);
         }
+      }
+
+      // --- PULL PHASE ---
+      // Fetch latest from DB to keep all devices in sync
+      const pullReqs = await Promise.allSettled([
+        fetch("/api/sync/categories").then((r) => r.json()),
+        fetch("/api/sync/products").then((r) => r.json()),
+        fetch("/api/sync/transactions").then((r) => r.json()),
+        fetch("/api/sync/expenses").then((r) => r.json()),
+        fetch("/api/sync/reports").then((r) => r.json()),
+      ]);
+
+      let dispatchNeeded = false;
+
+      // Helper to merge local pending items with live server items
+      const mergeArrays = <T extends { id: string; syncStatus?: string }>(
+        localArray: T[],
+        serverArray: T[]
+      ): T[] => {
+        const pendingItems = localArray.filter((i) => i.syncStatus !== "synced");
+        const pendingIds = new Set(pendingItems.map((i) => i.id));
+        const filteredServerItems = serverArray.filter((i) => !pendingIds.has(i.id));
+        return [...pendingItems, ...filteredServerItems];
+      };
+
+      // 1. Categories
+      if (pullReqs[0].status === "fulfilled" && pullReqs[0].value.success) {
+        const serverCategories = pullReqs[0].value.categories;
+        const newCategories = mergeArrays(allCategories, serverCategories);
+        if (JSON.stringify(newCategories) !== JSON.stringify(allCategories)) {
+          setItem(KEYS.CATEGORIES, newCategories);
+          dispatchNeeded = true;
+        }
+      }
+
+      // 2. Products
+      if (pullReqs[1].status === "fulfilled" && pullReqs[1].value.success) {
+        const serverProducts = pullReqs[1].value.products;
+        const newProducts = mergeArrays(allProducts, serverProducts);
+        if (JSON.stringify(newProducts) !== JSON.stringify(allProducts)) {
+          setItem(KEYS.PRODUCTS, newProducts);
+          dispatchNeeded = true;
+        }
+      }
+
+      // 3. Transactions
+      if (pullReqs[2].status === "fulfilled" && pullReqs[2].value.success) {
+        const serverTransactions = pullReqs[2].value.transactions;
+        const newTransactions = mergeArrays(allTxns, serverTransactions);
+        if (JSON.stringify(newTransactions) !== JSON.stringify(allTxns)) {
+          setItem(KEYS.TRANSACTIONS, newTransactions);
+          dispatchNeeded = true;
+        }
+      }
+
+      // 4. Expenses
+      if (pullReqs[3].status === "fulfilled" && pullReqs[3].value.success) {
+        const serverExpenses = pullReqs[3].value.expenses;
+        const newExpenses = mergeArrays(allExpenses, serverExpenses);
+        if (JSON.stringify(newExpenses) !== JSON.stringify(allExpenses)) {
+          setItem(KEYS.EXPENSES, newExpenses);
+          dispatchNeeded = true;
+        }
+      }
+
+      // 5. Reports
+      if (pullReqs[4].status === "fulfilled" && pullReqs[4].value.success) {
+        const serverReports = pullReqs[4].value.reports;
+        const newReports = mergeArrays(allReports, serverReports);
+        if (JSON.stringify(newReports) !== JSON.stringify(allReports)) {
+          setItem(KEYS.ARCHIVED_REPORTS, newReports);
+          dispatchNeeded = true;
+        }
+      }
+
+      if (dispatchNeeded) {
+        window.dispatchEvent(new Event("syncRequested"));
       }
 
     } catch (error) {

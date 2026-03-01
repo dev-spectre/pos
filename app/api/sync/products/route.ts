@@ -58,3 +58,22 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const products = await prisma.product.findMany();
+
+    const formattedProducts = products.map(p => ({
+      ...p,
+      syncStatus: "synced"
+    }));
+
+    return NextResponse.json({ success: true, products: formattedProducts });
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

@@ -77,3 +77,37 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const transactions = await prisma.transaction.findMany({
+      include: { items: true },
+      orderBy: { timestamp: 'desc' },
+      take: 500
+    });
+
+    const formattedTransactions = transactions.map(t => ({
+      id: t.id,
+      date: t.date,
+      timestamp: t.timestamp,
+      total: t.total,
+      paymentMode: t.paymentMode,
+      items: t.items.map(i => ({
+        productId: i.productId,
+        productName: i.productName,
+        price: i.price,
+        quantity: i.quantity,
+        subtotal: i.subtotal,
+      })),
+      syncStatus: "synced"
+    }));
+
+    return NextResponse.json({ success: true, transactions: formattedTransactions });
+  } catch (error) {
+    console.error("Failed to fetch transactions:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

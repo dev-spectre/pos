@@ -43,3 +43,22 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const categories = await prisma.category.findMany();
+    
+    const formattedCategories = categories.map(c => ({
+      ...c,
+      syncStatus: "synced"
+    }));
+
+    return NextResponse.json({ success: true, categories: formattedCategories });
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

@@ -75,10 +75,10 @@ export function useClosingReport() {
     // Archive the report
     const existing = getItem<DailyReport[]>(KEYS.ARCHIVED_REPORTS) ?? [];
     setItem(KEYS.ARCHIVED_REPORTS, [...existing, report]);
-    // Remove today's transactions from live store
-    const allTxns = getItem<Transaction[]>(KEYS.TRANSACTIONS) ?? [];
-    const remaining = allTxns.filter((t) => t.date !== report.date);
-    setItem(KEYS.TRANSACTIONS, remaining);
+
+    // We no longer remove today's transactions from live store
+    // This allows the History page to view transactions from any day
+    
     // Clear opening cash
     removeItem(KEYS.OPENING_CASH);
     

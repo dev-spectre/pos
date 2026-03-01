@@ -71,11 +71,17 @@ export function useTransactions() {
     };
   }, [loadToday]);
 
+  const getTransactionsByDate = useCallback((date: string): Transaction[] => {
+    const all = getItem<Transaction[]>(KEYS.TRANSACTIONS) ?? [];
+    return all.filter((t) => t.date === date);
+  }, []);
+
   return {
     transactions,
     saveTransaction,
     deleteTransaction,
     getDailySummary,
+    getTransactionsByDate,
     refreshTransactions: () => setTransactions(loadToday()),
   };
 }

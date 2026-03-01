@@ -78,3 +78,38 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET() {
+  try {
+    const reports = await prisma.dailyReport.findMany({
+      orderBy: { archivedAt: 'desc' },
+      take: 100
+    });
+    
+    const formattedReports = reports.map(r => ({
+      id: r.id,
+      date: r.date,
+      archivedAt: r.archivedAt,
+      openingCash: r.openingCash,
+      totalExpenses: r.totalExpenses,
+      netProfit: r.netProfit,
+      transactionCount: r.transactionCount,
+      summary: {
+        totalSales: r.totalSales,
+        cashSales: r.cashSales,
+        upiSales: r.upiSales,
+        cardSales: r.cardSales,
+        totalItems: r.totalItems,
+      },
+      syncStatus: "synced"
+    }));
+
+    return NextResponse.json({ success: true, reports: formattedReports });
+  } catch (error) {
+    console.error("Failed to fetch reports:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
