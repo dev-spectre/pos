@@ -259,6 +259,33 @@ export default function AdminPage() {
         </button>
       </div>
 
+      {/* Payment Settings Section */}
+      <div
+        className="rounded-2xl overflow-hidden p-4"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+      >
+        <span className="font-semibold text-sm mb-3 block" style={{ color: "var(--text-primary)" }}>
+          Payment Settings
+        </span>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Receiver UPI ID (e.g. name@upi)"
+            defaultValue={typeof window !== "undefined" ? getItem<string>(KEYS.UPI_ID) ?? "" : ""}
+            onBlur={(e) => setItem(KEYS.UPI_ID, e.target.value.trim())}
+            className="flex-1 px-3 py-2 rounded-xl outline-none text-sm"
+            style={{
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+            }}
+          />
+        </div>
+        <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+          Set this UPI ID to show a QR code for customers to scan during checkout. Leaves it blank to disable the QR popup.
+        </p>
+      </div>
+
       {/* Category Section */}
       <CategorySection categories={categories} onAdd={addCategory} />
 

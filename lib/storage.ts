@@ -37,4 +37,5 @@ export const KEYS = {
   DARK_MODE: "tst_dark_mode", // boolean
   ADMIN_PIN: "tst_admin_pin", // string (default "1234")
   SLOW_MOVING_THRESHOLD: "tst_slow_threshold", // number (default 2)
+  UPI_ID: "tst_upi_id", // string (UPI ID for QR)
 } as const;
