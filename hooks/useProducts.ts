@@ -3,20 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Category, Product } from "@/types";
 import { getItem, setItem, KEYS } from "@/lib/storage";
-import { DEFAULT_CATEGORIES, SEED_PRODUCTS } from "@/lib/seedData";
 import { generateId } from "@/lib/utils";
 
 function initializeData() {
   const seeded = getItem<boolean>(KEYS.SEEDED);
   if (!seeded) {
-    const defaultCats = DEFAULT_CATEGORIES.map((c) => ({ ...c, syncStatus: "pending" as const }));
-    setItem(KEYS.CATEGORIES, defaultCats);
-    const products: Product[] = SEED_PRODUCTS.map((p) => ({
-      ...p,
-      orderFrequency: 0,
-      syncStatus: "pending",
-    }));
-    setItem(KEYS.PRODUCTS, products);
+    setItem(KEYS.CATEGORIES, []);
+    setItem(KEYS.PRODUCTS, []);
     setItem(KEYS.SEEDED, true);
   }
 }
@@ -145,6 +138,33 @@ export function useProducts() {
     [categories, saveCategories]
   );
 
+  const updateCategory = useCallback(
+    (id: string, name: string) => {
+      const updated = categories.map((c) =>
+        c.id === id ? { ...c, name, syncStatus: "pending" as const } : c
+      );
+      saveCategories(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
+    },
+    [categories, saveCategories]
+  );
+
+  const deleteCategory = useCallback(
+    (id: string) => {
+      const updated = categories.filter((c) => c.id !== id);
+      saveCategories(updated);
+      
+      // Also remove products in this category? 
+      // User says "delete category", if we don't delete products they might be orphaned.
+      // Or maybe let's just delete the category for now, or delete related products too.
+      // Usually, we should cascade or let products stay. But better to just delete the tag.
+    },
+    [categories, saveCategories]
+  );
+
   const getProductsByCategory = useCallback(
     (categoryId: string) => {
       return products
@@ -164,6 +184,8 @@ export function useProducts() {
     toggleActive,
     incrementFrequency,
     addCategory,
+    updateCategory,
+    deleteCategory,
     getProductsByCategory,
   };
 }

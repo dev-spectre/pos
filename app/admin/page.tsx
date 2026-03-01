@@ -126,17 +126,30 @@ function ProductForm({
 function CategorySection({
   categories,
   onAdd,
+  onEdit,
+  onDelete,
 }: {
   categories: { id: string; name: string }[];
   onAdd: (name: string) => void;
+  onEdit: (id: string, name: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const [newCat, setNewCat] = useState("");
   const [open, setOpen] = useState(false);
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editingCatName, setEditingCatName] = useState("");
 
   function handleAdd() {
     if (!newCat.trim()) return;
     onAdd(newCat.trim());
     setNewCat("");
+  }
+
+  function handleSaveEdit() {
+    if (editingCatId && editingCatName.trim()) {
+      onEdit(editingCatId, editingCatName.trim());
+    }
+    setEditingCatId(null);
   }
 
   return (
@@ -155,18 +168,36 @@ function CategorySection({
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-3" style={{ borderTop: "1px solid var(--border)" }}>
-          <div className="flex flex-wrap gap-2 pt-3">
+          <div className="flex flex-col gap-2 pt-3">
             {categories.map((c) => (
-              <span
-                key={c.id}
-                className="px-3 py-1 rounded-full text-xs font-medium"
-                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-              >
-                {c.name}
-              </span>
+              editingCatId === c.id ? (
+                <div key={c.id} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={editingCatName}
+                    onChange={(e) => setEditingCatName(e.target.value)}
+                    className="flex-1 px-3 py-1.5 rounded-xl outline-none text-sm"
+                    style={{
+                      background: "var(--bg-elevated)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-primary)",
+                    }}
+                  />
+                  <button onClick={handleSaveEdit} className="p-2 rounded-xl text-green-500 bg-green-500/10"><Check size={14}/></button>
+                  <button onClick={() => setEditingCatId(null)} className="p-2 rounded-xl text-red-500 bg-red-500/10"><X size={14}/></button>
+                </div>
+              ) : (
+                <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: "var(--accent-soft)" }}>
+                  <span className="text-sm font-medium" style={{ color: "var(--accent)" }}>{c.name}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setEditingCatId(c.id); setEditingCatName(c.name); }} className="p-1.5 rounded-lg text-blue-500 hover:bg-black/10 dark:hover:bg-white/10"><Pencil size={14}/></button>
+                    <button onClick={() => { if(confirm(`Delete "${c.name}" category?`)) onDelete(c.id); }} className="p-1.5 rounded-lg text-red-500 hover:bg-black/10 dark:hover:bg-white/10"><Trash2 size={14}/></button>
+                  </div>
+                </div>
+              )
             ))}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-3">
             <input
               type="text"
               value={newCat}
@@ -202,11 +233,13 @@ export default function AdminPage() {
     updateProduct,
     deleteProduct,
     toggleActive,
+    addCategory,
+    updateCategory,
+    deleteCategory,
   } = useProducts();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [addCategory] = [useProducts().addCategory];
   const [filterCat, setFilterCat] = useState("all");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
 
@@ -287,7 +320,12 @@ export default function AdminPage() {
       </div>
 
       {/* Category Section */}
-      <CategorySection categories={categories} onAdd={addCategory} />
+      <CategorySection
+        categories={categories}
+        onAdd={addCategory}
+        onEdit={updateCategory}
+        onDelete={deleteCategory}
+      />
 
       {/* Product Management Header */}
       <div className="flex items-center justify-between">
