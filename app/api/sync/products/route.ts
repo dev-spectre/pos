@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       syncedCount: results.length,
-      syncedIds: results.map((r) => r.id),
+      syncedIds: results.map((r: typeof results[0]) => r.id),
     });
   } catch (error) {
     console.error("Failed to sync products:", error);

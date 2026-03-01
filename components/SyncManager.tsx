@@ -108,7 +108,7 @@ export function SyncManager() {
         if (resRep.ok) {
           const { syncedIds } = await resRep.json();
           const syncedIdsSet = new Set(syncedIds);
-          allReports = allReports.map((r) =>
+          allReports = allReports.map((r: typeof allReports[0]) =>
             syncedIdsSet.has(r.id) ? { ...r, syncStatus: "synced" as const } : r
           );
           setItem(KEYS.ARCHIVED_REPORTS, allReports);
