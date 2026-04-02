@@ -243,7 +243,10 @@ export default function AdminPage() {
   const [filterCat, setFilterCat] = useState("all");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
 
+  const visibleCategories = categories.filter((c) => !c.deleted);
+
   const filtered = products.filter((p) => {
+    if (p.deleted) return false;
     const catMatch = filterCat === "all" || p.categoryId === filterCat;
     const activeMatch =
       filterActive === "all" ||
@@ -321,7 +324,7 @@ export default function AdminPage() {
 
       {/* Category Section */}
       <CategorySection
-        categories={categories}
+        categories={visibleCategories}
         onAdd={addCategory}
         onEdit={updateCategory}
         onDelete={deleteCategory}
@@ -330,7 +333,7 @@ export default function AdminPage() {
       {/* Product Management Header */}
       <div className="flex items-center justify-between">
         <h2 className="font-bold text-base" style={{ color: "var(--text-primary)" }}>
-          Products ({products.length})
+          Products ({products.filter((p) => !p.deleted).length})
         </h2>
         <button
           onClick={() => { setShowAddForm(!showAddForm); setEditingId(null); }}
@@ -345,7 +348,7 @@ export default function AdminPage() {
       {/* Add Product Form */}
       {showAddForm && (
         <ProductForm
-          categories={categories}
+          categories={visibleCategories}
           onSave={(data) => {
             addProduct(data);
             setShowAddForm(false);
@@ -367,7 +370,7 @@ export default function AdminPage() {
           }}
         >
           <option value="all">All Categories</option>
-          {categories.map((c) => (
+          {visibleCategories.map((c) => (
             <option key={c.id} value={c.id} style={{ background: "var(--bg-card)" }}>
               {c.name}
             </option>
@@ -400,7 +403,7 @@ export default function AdminPage() {
           editingId === product.id ? (
             <ProductForm
               key={product.id}
-              categories={categories}
+              categories={visibleCategories}
               initial={product}
               onSave={(data) => {
                 updateProduct(product.id, data);

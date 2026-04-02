@@ -29,9 +29,7 @@ export default function BillingPage() {
   } = useBill();
   const { saveTransaction } = useTransactions();
 
-  const [activeCategoryId, setActiveCategoryId] = useState<string>(
-    categories[0]?.id ?? "starters"
-  );
+  const [activeCategoryId, setActiveCategoryId] = useState<string>("__all__");
   const [toast, setToast] = useState<string | null>(null);
   const [billOpen, setBillOpen] = useState(false);
   const [showUpiQr, setShowUpiQr] = useState(false);
@@ -44,7 +42,9 @@ export default function BillingPage() {
 
   // Use initialized categories
   const displayCategories =
-    categories.length > 0 ? categories : [{ id: "starters", name: "Starters" }];
+    categories.length > 0
+      ? [{ id: "__all__", name: "All" }, ...categories.filter((c) => !(c as any).deleted)]
+      : [{ id: "__all__", name: "All" }, { id: "starters", name: "Starters" }];
 
   // Ensure activeCategoryId is valid
   const resolvedCategoryId =
@@ -167,7 +167,7 @@ export default function BillingPage() {
         {/* Search */}
         <div className="pt-2">
           <SearchBar
-            products={products.filter((p) => p.active)}
+            products={products.filter((p) => p.active && !(p as any).deleted)}
             onSelect={(p: Product) => addItem(p)}
           />
         </div>

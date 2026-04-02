@@ -51,7 +51,14 @@ export function useExpenses() {
   const deleteExpense = useCallback(
     (id: string) => {
       const all = load();
-      persist(all.filter((e) => e.id !== id));
+      const updated = all.map((e) =>
+        e.id === id ? { ...e, deleted: true, syncStatus: "pending" as const } : e
+      );
+      persist(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [load, persist]
   );
@@ -59,7 +66,7 @@ export function useExpenses() {
   const getTodayExpenses = useCallback((): Expense[] => {
     const today = getTodayKey();
     return (getItem<Expense[]>(KEYS.EXPENSES) ?? []).filter(
-      (e) => e.date === today
+      (e) => e.date === today && !e.deleted
     );
   }, []);
 
@@ -69,7 +76,7 @@ export function useExpenses() {
 
   const getExpensesByDate = useCallback((date: string): Expense[] => {
     return (getItem<Expense[]>(KEYS.EXPENSES) ?? []).filter(
-      (e) => e.date === date
+      (e) => e.date === date && !e.deleted
     );
   }, []);
 

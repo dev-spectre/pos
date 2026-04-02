@@ -21,8 +21,8 @@ export function useProducts() {
 
   useEffect(() => {
     initializeData();
-    const storedProducts = getItem<Product[]>(KEYS.PRODUCTS) ?? [];
-    const storedCategories = getItem<Category[]>(KEYS.CATEGORIES) ?? [];
+    const storedProducts = (getItem<Product[]>(KEYS.PRODUCTS) ?? []);
+    const storedCategories = (getItem<Category[]>(KEYS.CATEGORIES) ?? []);
     setProducts(storedProducts);
     setCategories(storedCategories);
     setInitialized(true);
@@ -33,9 +33,15 @@ export function useProducts() {
         .then((res) => res.json())
         .then((serverProducts) => {
           if (Array.isArray(serverProducts) && serverProducts.length > 0) {
-            const syncedProducts = serverProducts.map((p: any) => ({ ...p, syncStatus: "synced" }));
-            setItem(KEYS.PRODUCTS, syncedProducts);
-            setProducts(syncedProducts);
+            // Merge: keep locally deleted items (pending sync) and add server items
+            const localDeleted = storedProducts.filter((p: Product) => p.deleted && p.syncStatus === "pending");
+            const localDeletedIds = new Set(localDeleted.map((p: Product) => p.id));
+            const syncedProducts = serverProducts
+              .filter((p: any) => !localDeletedIds.has(p.id))
+              .map((p: any) => ({ ...p, syncStatus: "synced" }));
+            const merged = [...localDeleted, ...syncedProducts];
+            setItem(KEYS.PRODUCTS, merged);
+            setProducts(merged);
           }
         })
         .catch((err) => console.error("Failed to fetch products:", err));
@@ -87,8 +93,14 @@ export function useProducts() {
 
   const deleteProduct = useCallback(
     (id: string) => {
-      const updated = products.filter((p) => p.id !== id);
+      const updated = products.map((p) =>
+        p.id === id ? { ...p, deleted: true, syncStatus: "pending" as const } : p
+      );
       saveProducts(updated);
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [products, saveProducts]
   );
@@ -154,13 +166,14 @@ export function useProducts() {
 
   const deleteCategory = useCallback(
     (id: string) => {
-      const updated = categories.filter((c) => c.id !== id);
+      const updated = categories.map((c) =>
+        c.id === id ? { ...c, deleted: true, syncStatus: "pending" as const } : c
+      );
       saveCategories(updated);
       
-      // Also remove products in this category? 
-      // User says "delete category", if we don't delete products they might be orphaned.
-      // Or maybe let's just delete the category for now, or delete related products too.
-      // Usually, we should cascade or let products stay. But better to just delete the tag.
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("syncRequested"));
+      }
     },
     [categories, saveCategories]
   );
@@ -168,7 +181,7 @@ export function useProducts() {
   const getProductsByCategory = useCallback(
     (categoryId: string) => {
       return products
-        .filter((p) => p.categoryId === categoryId && p.active)
+        .filter((p) => !p.deleted && p.active && (categoryId === "__all__" || p.categoryId === categoryId))
         .sort((a, b) => b.orderFrequency - a.orderFrequency);
     },
     [products]

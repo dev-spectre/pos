@@ -50,11 +50,15 @@ export function SyncManager() {
           body: JSON.stringify({ categories: pendingCategories }),
         });
         if (resCat.ok) {
-          const { syncedIds } = await resCat.json();
+          const { syncedIds, deletedIds } = await resCat.json();
           const syncedIdsSet = new Set(syncedIds);
-          allCategories = allCategories.map((c) =>
-            syncedIdsSet.has(c.id) ? { ...c, syncStatus: "synced" as const } : c
-          );
+          const deletedIdsSet = new Set(deletedIds ?? []);
+          // Remove confirmed-deleted items, mark synced items
+          allCategories = allCategories
+            .filter((c) => !deletedIdsSet.has(c.id))
+            .map((c) =>
+              syncedIdsSet.has(c.id) ? { ...c, syncStatus: "synced" as const } : c
+            );
           setItem(KEYS.CATEGORIES, allCategories);
         }
       }
@@ -70,11 +74,14 @@ export function SyncManager() {
           body: JSON.stringify({ products: pendingProducts }),
         });
         if (resProd.ok) {
-          const { syncedIds } = await resProd.json();
+          const { syncedIds, deletedIds } = await resProd.json();
           const syncedIdsSet = new Set(syncedIds);
-          allProducts = allProducts.map((p) =>
-            syncedIdsSet.has(p.id) ? { ...p, syncStatus: "synced" as const } : p
-          );
+          const deletedIdsSet = new Set(deletedIds ?? []);
+          allProducts = allProducts
+            .filter((p) => !deletedIdsSet.has(p.id))
+            .map((p) =>
+              syncedIdsSet.has(p.id) ? { ...p, syncStatus: "synced" as const } : p
+            );
           setItem(KEYS.PRODUCTS, allProducts);
         }
       }
@@ -112,11 +119,14 @@ export function SyncManager() {
         });
 
         if (resExp.ok) {
-          const { syncedIds } = await resExp.json();
+          const { syncedIds, deletedIds } = await resExp.json();
           const syncedIdsSet = new Set(syncedIds);
-          allExpenses = allExpenses.map((e) =>
-            syncedIdsSet.has(e.id) ? { ...e, syncStatus: "synced" as const } : e
-          );
+          const deletedIdsSet = new Set(deletedIds ?? []);
+          allExpenses = allExpenses
+            .filter((e) => !deletedIdsSet.has(e.id))
+            .map((e) =>
+              syncedIdsSet.has(e.id) ? { ...e, syncStatus: "synced" as const } : e
+            );
           setItem(KEYS.EXPENSES, allExpenses);
         }
       }

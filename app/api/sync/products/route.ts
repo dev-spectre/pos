@@ -12,6 +12,7 @@ export async function POST(request: Request) {
         price: number; 
         active: boolean; 
         orderFrequency: number; 
+        deleted?: boolean;
       }[] 
     };
 
@@ -22,33 +23,54 @@ export async function POST(request: Request) {
       );
     }
 
-    const results = await prisma.$transaction(
-      products.map((prod) =>
-        prisma.product.upsert({
-          where: { id: prod.id },
-          create: {
-            id: prod.id,
-            name: prod.name,
-            categoryId: prod.categoryId,
-            price: prod.price,
-            active: prod.active,
-            orderFrequency: prod.orderFrequency,
-          },
-          update: {
-            name: prod.name,
-            categoryId: prod.categoryId,
-            price: prod.price,
-            active: prod.active,
-            orderFrequency: prod.orderFrequency,
-          },
-        })
-      )
-    );
+    const toDelete = products.filter((p) => p.deleted);
+    const toUpsert = products.filter((p) => !p.deleted);
+
+    const deleteIds = toDelete.map((p) => p.id);
+    
+    // Delete products marked as deleted (ignore if not found)
+    if (deleteIds.length > 0) {
+      await prisma.billItemRecord.deleteMany({
+        where: { productId: { in: deleteIds } },
+      });
+      await prisma.product.deleteMany({
+        where: { id: { in: deleteIds } },
+      });
+    }
+
+    // Upsert remaining products
+    let syncedIds: string[] = [];
+    if (toUpsert.length > 0) {
+      const results = await prisma.$transaction(
+        toUpsert.map((prod) =>
+          prisma.product.upsert({
+            where: { id: prod.id },
+            create: {
+              id: prod.id,
+              name: prod.name,
+              categoryId: prod.categoryId,
+              price: prod.price,
+              active: prod.active,
+              orderFrequency: prod.orderFrequency,
+            },
+            update: {
+              name: prod.name,
+              categoryId: prod.categoryId,
+              price: prod.price,
+              active: prod.active,
+              orderFrequency: prod.orderFrequency,
+            },
+          })
+        )
+      );
+      syncedIds = results.map((r: typeof results[0]) => r.id);
+    }
 
     return NextResponse.json({
       success: true,
-      syncedCount: results.length,
-      syncedIds: results.map((r: typeof results[0]) => r.id),
+      syncedCount: syncedIds.length,
+      syncedIds,
+      deletedIds: deleteIds,
     });
   } catch (error) {
     console.error("Failed to sync products:", error);

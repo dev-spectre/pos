@@ -14,31 +14,46 @@ export async function POST(request: Request) {
       );
     }
 
-    const results = await prisma.$transaction(
-      expenses.map((exp) =>
-        prisma.expense.upsert({
-          where: { id: exp.id },
-          create: {
-            id: exp.id,
-            title: exp.title,
-            category: exp.category,
-            amount: exp.amount,
-            date: exp.date,
-            notes: exp.notes || "",
-            createdAt: exp.createdAt,
-          },
-          update: {
-            // Usually we wouldn't update existing expenses unless edited,
-            // upsert handles accidental double-submissions gracefully.
-          },
-        })
-      )
-    );
+    const toDelete = expenses.filter((e) => e.deleted);
+    const toUpsert = expenses.filter((e) => !e.deleted);
+
+    const deleteIds = toDelete.map((e) => e.id);
+
+    // Delete expenses marked as deleted
+    if (deleteIds.length > 0) {
+      await prisma.expense.deleteMany({
+        where: { id: { in: deleteIds } },
+      });
+    }
+
+    // Upsert remaining expenses
+    let syncedIds: string[] = [];
+    if (toUpsert.length > 0) {
+      const results = await prisma.$transaction(
+        toUpsert.map((exp) =>
+          prisma.expense.upsert({
+            where: { id: exp.id },
+            create: {
+              id: exp.id,
+              title: exp.title,
+              category: exp.category,
+              amount: exp.amount,
+              date: exp.date,
+              notes: exp.notes || "",
+              createdAt: exp.createdAt,
+            },
+            update: {},
+          })
+        )
+      );
+      syncedIds = results.map((r: { id: string }) => r.id);
+    }
 
     return NextResponse.json({
       success: true,
-      syncedCount: results.length,
-      syncedIds: results.map((r: { id: string }) => r.id),
+      syncedCount: syncedIds.length,
+      syncedIds,
+      deletedIds: deleteIds,
     });
   } catch (error) {
     console.error("Failed to sync expenses:", error);
