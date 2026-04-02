@@ -133,34 +133,75 @@ export default function ClosingPage() {
   // ── Export CSV ──────────────────────────────────────────────────
   const exportCSV = useCallback(() => {
     if (!report) return;
-    const rows = [
-      ["Daily Closing Report", formatDate(report.date)],
-      [],
-      ["Field", "Value"],
-      ["Opening Cash", report.openingCash.toFixed(2)],
-      ["Total Sales", report.summary.totalSales.toFixed(2)],
-      ["Cash Sales", report.summary.cashSales.toFixed(2)],
-      ["UPI Sales", report.summary.upiSales.toFixed(2)],
-      ["Card Sales", report.summary.cardSales.toFixed(2)],
-      ["Total Items Sold", report.summary.totalItems.toString()],
-      ["Bills Count", report.transactionCount.toString()],
-      ["Total Expenses", report.totalExpenses.toFixed(2)],
-      ["Net Profit", report.netProfit.toFixed(2)],
-      [],
-      ["Transactions"],
-      ["Time", "Items", "Total", "Payment"],
-      ...report.transactions.map((t) => [
-        formatTime(t.timestamp),
-        t.items.map((i) => `${i.productName}×${i.quantity}`).join("; "),
-        t.total.toFixed(2),
-        t.paymentMode.toUpperCase(),
-      ]),
-      [],
-      ["Expenses"],
-      ["Title", "Category", "Amount", "Notes"],
-      ...report.expenses.map((e) => [e.title, e.category, e.amount.toFixed(2), e.notes ?? ""]),
+
+    const SEP = ["", "", "", ""];
+    const DIVIDER = ["────────────────────", "────────────────", "────────────────", "────────────────"];
+
+    const rows: (string | number)[][] = [
+      // Header
+      ["DAILY CLOSING REPORT"],
+      ["Date:", formatDate(report.date), "", `Generated: ${formatTime(report.archivedAt)}`],
+      SEP,
+
+      // Summary Section
+      DIVIDER,
+      ["SUMMARY", "", "", ""],
+      DIVIDER,
+      ["", "", "", ""],
+      ["Opening Cash", "", "", formatCurrency(report.openingCash)],
+      ["", "", "", ""],
+      ["Total Sales", "", "", formatCurrency(report.summary.totalSales)],
+      ["  Cash Sales", "", "", formatCurrency(report.summary.cashSales)],
+      ["  UPI Sales", "", "", formatCurrency(report.summary.upiSales)],
+      ["  Card Sales", "", "", formatCurrency(report.summary.cardSales)],
+      ["", "", "", ""],
+      ["Total Items Sold", "", "", report.summary.totalItems.toString()],
+      ["Total Bills", "", "", report.transactionCount.toString()],
+      ["Total Expenses", "", "", formatCurrency(report.totalExpenses)],
+      ["", "", "", ""],
+      ["NET PROFIT", "", "", formatCurrency(report.netProfit)],
+      SEP,
     ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+
+    // Transactions Section
+    if (report.transactions.length > 0) {
+      rows.push(
+        DIVIDER,
+        [`TRANSACTIONS (${report.transactions.length})`, "", "", ""],
+        DIVIDER,
+        ["#", "Time", "Items", "Total", "Payment"],
+        ...report.transactions.map((t, i) => [
+          (i + 1).toString(),
+          formatTime(t.timestamp),
+          t.items.map((item) => `${item.productName} x${item.quantity}`).join("; "),
+          t.total.toFixed(2),
+          t.paymentMode.toUpperCase(),
+        ]),
+        SEP,
+      );
+    }
+
+    // Expenses Section
+    if (report.expenses.length > 0) {
+      rows.push(
+        DIVIDER,
+        [`EXPENSES (${report.expenses.length})`, "", "", ""],
+        DIVIDER,
+        ["#", "Title", "Category", "Amount", "Notes"],
+        ...report.expenses.map((e, i) => [
+          (i + 1).toString(),
+          e.title,
+          e.category,
+          e.amount.toFixed(2),
+          e.notes ?? "",
+        ]),
+        SEP,
+      );
+    }
+
+    const csv = rows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

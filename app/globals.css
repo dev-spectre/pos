@@ -86,6 +86,63 @@ input[type=number] { -moz-appearance: textfield; }
 /* Print styles for closing report */
 @media print {
   .no-print { display: none !important; }
-  body { background: #fff !important; color: #000 !important; }
   .print-only { display: block !important; }
+
+  /* Hide TopBar (header) and BottomNav (nav) */
+  header, nav {
+    display: none !important;
+  }
+
+  /* Break body out of h-screen / overflow-hidden / flex layout */
+  body {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Break main out of flex-1 / overflow-y-auto / pb-20 */
+  main {
+    display: block !important;
+    flex: none !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Also reset any wrapper divs between body and content */
+  body > *,
+  body > * > * {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Remove card styling so content flows across pages */
+  #closing-report-root,
+  #closing-report-root > div {
+    overflow: visible !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Avoid breaking individual rows across pages */
+  #closing-report-root .divide-y > div {
+    break-inside: avoid;
+  }
+
+  /* Keep section headers attached to content */
+  #closing-report-root .px-4.py-3 {
+    break-after: avoid;
+  }
+
+  /* Ensure text is black on white for print */
+  #closing-report-root * {
+    color: #000 !important;
+  }
 }
